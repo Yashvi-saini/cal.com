@@ -6,6 +6,8 @@ import { z } from "zod";
 import { shallow } from "zustand/shallow";
 
 import { useLocale } from "@calcom/lib/hooks/useLocale";
+import { intervalLimitsType } from "@calcom/lib/intervalLimits/intervalLimitSchema";
+import type { IntervalLimit } from "@calcom/lib/intervalLimits/intervalLimitSchema";
 import { MembershipRole } from "@calcom/prisma/enums";
 import { trpc } from "@calcom/trpc/react";
 import { Avatar } from "@calcom/ui/components/avatar";
@@ -30,8 +32,11 @@ import type { MemberPermissions } from "@calcom/features/pbac/lib/team-member-pe
 import { updateRoleInCache, getUpdatedUser } from "./MemberChangeRoleModal";
 import type { Action, State, User } from "./MemberList";
 
+import { MemberBookingLimits } from "./MemberBookingLimits";
+
 const formSchema = z.object({
   role: z.union([z.nativeEnum(MembershipRole), z.string()]), // Support both traditional roles and custom role IDs
+  bookingLimits: intervalLimitsType.optional(),
 });
 
 type FormSchema = z.infer<typeof formSchema>;
@@ -116,10 +121,11 @@ export function EditMemberSheet({
   const hasCustomRoles = customRoles && customRoles.length > 0;
   const shouldUseSelect = hasCustomRoles; // Use Select for custom roles, ToggleGroup for traditional roles
 
-  const form = useForm({
+  const form = useForm<FormSchema>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       role: selectedUser.customRoleId || selectedUser.role, // Use custom role ID if available, otherwise traditional role
+      bookingLimits: (selectedUser.bookingLimits as unknown as IntervalLimit) || {},
     },
   });
 
@@ -130,6 +136,15 @@ export function EditMemberSheet({
     });
 
   const connectedApps = getUserConnectedApps?.[selectedUser.id];
+
+  const updateMembershipMutation = trpc.viewer.teams.updateMembership.useMutation({
+    onSuccess: async () => {
+      await utils.viewer.teams.listMembers.invalidate();
+    },
+    onError: (err) => {
+      showToast(err.message, "error");
+    }
+  });
 
   const changeRoleMutation = trpc.viewer.teams.changeMemberRole.useMutation({
     onMutate: async ({ teamId, memberId, role }) => {
@@ -153,35 +168,65 @@ export function EditMemberSheet({
 
       return { previousValue };
     },
-    onSuccess: async (_data, { role }) => {
-      setRole(role as string);
-      setMutationLoading(false);
+    async onError(err) {
+      showToast(err.message, "error");
+    },
+  });
+
+  async function onSave(values: FormSchema) {
+    setMutationLoading(true);
+    try {
+      const promises = [];
+
+      const currentRole = selectedUser.customRoleId || selectedUser.role;
+      if (values.role !== currentRole) {
+        promises.push(changeRoleMutation.mutateAsync({
+          teamId: teamId,
+          memberId: user?.id as number,
+          role: values.role,
+        }));
+      }
+
+     
+      if (values.bookingLimits) {
+        const bookingLimits = values.bookingLimits;
+        promises.push(updateMembershipMutation.mutateAsync({
+          teamId,
+          memberId: user?.id as number,
+          bookingLimits: bookingLimits,
+        }));
+      }
+
+      await Promise.all(promises);
+
+      if (values.role !== currentRole) {
+        setRole(values.role as string);
+      }
+
       await utils.viewer.teams.get.invalidate();
       await utils.viewer.teams.listMembers.invalidate();
       showToast(t("profile_updated_successfully"), "success");
       setEditMode(false);
 
+      const updatedUser = getUpdatedUser(selectedUser, values.role, customRoles);
+      // Explicitly merge bookingLimits into user, as getUpdatedUser doesn't handle it yet
+      if (values.bookingLimits) {
+        updatedUser.bookingLimits = values.bookingLimits;
+      }
+
       dispatch({
         type: "EDIT_USER_SHEET",
         payload: {
           showModal: true,
-          user: getUpdatedUser(selectedUser, role, customRoles),
+          user: updatedUser,
         },
       });
-    },
-    async onError(err) {
-      showToast(err.message, "error");
-      setMutationLoading(false);
-    },
-  });
 
-  function changeRole(values: FormSchema) {
-    setMutationLoading(true);
-    changeRoleMutation.mutate({
-      teamId: teamId,
-      memberId: user?.id as number,
-      role: values.role,
-    });
+    } catch (e: any) {
+      showToast(e.message || "Something went wrong", "error");
+    } finally {
+      setMutationLoading(false);
+    }
   }
 
   const appList = (connectedApps || []).map(({ logo, name, externalId }) => {
@@ -212,7 +257,7 @@ export function EditMemberSheet({
         {!isPending && !isLoadingRoles ? (
           <Form
             form={form}
-            handleSubmit={changeRole}
+            handleSubmit={onSave}
             className="flex h-full flex-col"
           >
             <SheetHeader showCloseButton={false} className="w-full">
@@ -322,6 +367,10 @@ export function EditMemberSheet({
                   </div>
                 </div>
               </div>
+
+              {editMode && (
+                <MemberBookingLimits />
+              )}
             </SheetBody>
             <SheetFooter className="mt-auto">
               <SheetFooterControls

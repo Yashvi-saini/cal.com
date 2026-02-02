@@ -72,6 +72,7 @@ export const listMembersHandler = async ({ ctx, input }: ListMembersHandlerOptio
       accepted: true,
       teamId: true,
       customRoleId: true,
+      bookingLimits: true,
       user: { select: userSelect },
     },
     cursor: cursor ? { id: cursor } : undefined,
@@ -135,6 +136,7 @@ export const listMembersHandler = async ({ ctx, input }: ListMembersHandlerOptio
         username: profile?.username ?? restUser.username,
         role: member.role,
         customRoleId: member.customRoleId,
+        bookingLimits: member.bookingLimits,
         customRole,
         profile: profile,
         organizationId: profile?.organizationId ?? null,
@@ -145,10 +147,10 @@ export const listMembersHandler = async ({ ctx, input }: ListMembersHandlerOptio
         teamId: member.teamId,
         lastActiveAt: member.user.lastActiveAt
           ? new Intl.DateTimeFormat(ctx.user.locale, {
-              timeZone: ctx.user.timeZone,
-            })
-              .format(member.user.lastActiveAt)
-              .toLowerCase()
+            timeZone: ctx.user.timeZone,
+          })
+            .format(member.user.lastActiveAt)
+            .toLowerCase()
           : null,
       };
     })

@@ -130,13 +130,13 @@ export const listMembersHandler = async ({ ctx, input }: GetOptions) => {
   const roleWhereClause = roleFilter
     ? pbacFeatureEnabled
       ? makeWhereClause({
-          columnName: "customRoleId",
-          filterValue: roleFilter.value,
-        })
+        columnName: "customRoleId",
+        filterValue: roleFilter.value,
+      })
       : makeWhereClause({
-          columnName: "role",
-          filterValue: roleFilter.value,
-        })
+        columnName: "role",
+        filterValue: roleFilter.value,
+      })
     : undefined;
 
   const whereClause: Prisma.MembershipWhereInput = {
@@ -236,6 +236,7 @@ export const listMembersHandler = async ({ ctx, input }: GetOptions) => {
       id: true,
       role: true,
       accepted: true,
+      bookingLimits: true,
       createdAt: true,
       updatedAt: true,
       customRole: true,
@@ -285,14 +286,14 @@ export const listMembersHandler = async ({ ctx, input }: GetOptions) => {
       const user = await new UserRepository(prisma).enrichUserWithItsProfile({ user: membership.user });
       let attributes:
         | Array<{
-            id: string;
-            value: string;
-            slug: string;
-            attributeId: string;
-            weight: number;
-            isGroup: boolean;
-            contains: string[];
-          }>
+          id: string;
+          value: string;
+          slug: string;
+          attributeId: string;
+          weight: number;
+          isGroup: boolean;
+          contains: string[];
+        }>
         | undefined;
 
       if (expand?.includes("attributes")) {
@@ -334,24 +335,25 @@ export const listMembersHandler = async ({ ctx, input }: GetOptions) => {
         completedOnboarding: user.completedOnboarding,
         lastActiveAt: membership.user.lastActiveAt
           ? new Intl.DateTimeFormat(ctx.user.locale, {
-              timeZone: ctx.user.timeZone,
-            })
-              .format(membership.user.lastActiveAt)
-              .toLowerCase()
+            timeZone: ctx.user.timeZone,
+          })
+            .format(membership.user.lastActiveAt)
+            .toLowerCase()
           : null,
+        bookingLimits: membership.bookingLimits,
         createdAt: membership.createdAt
           ? new Intl.DateTimeFormat(ctx.user.locale, {
-              timeZone: ctx.user.timeZone,
-            })
-              .format(membership.createdAt)
-              .toLowerCase()
+            timeZone: ctx.user.timeZone,
+          })
+            .format(membership.createdAt)
+            .toLowerCase()
           : null,
         updatedAt: membership.updatedAt
           ? new Intl.DateTimeFormat(ctx.user.locale, {
-              timeZone: ctx.user.timeZone,
-            })
-              .format(membership.updatedAt)
-              .toLowerCase()
+            timeZone: ctx.user.timeZone,
+          })
+            .format(membership.updatedAt)
+            .toLowerCase()
           : null,
         avatarUrl: user.avatarUrl,
         ...(ctx.user.organization.isOrgAdmin && { twoFactorEnabled: user.twoFactorEnabled }),
