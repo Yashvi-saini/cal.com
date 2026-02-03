@@ -487,4 +487,62 @@ describe("updateClientHandler", () => {
       })
     );
   });
+
+  it("sets status to PENDING when an owner edits 'purpose' of a REJECTED client (reapproval flow)", async () => {
+    mocks.findByClientIdIncludeUser.mockResolvedValue({
+      clientId: CLIENT_ID,
+      userId: OWNER_USER_ID,
+      name: CLIENT_NAME,
+      purpose: CLIENT_PURPOSE,
+      redirectUri: REDIRECT_URI,
+      websiteUrl: null,
+      logo: null,
+      status: "REJECTED",
+      user: null,
+    });
+
+    const updatedPurpose = "Review my new purpose";
+
+    const prismaUpdate = vi.fn().mockResolvedValue({
+      clientId: CLIENT_ID,
+      name: CLIENT_NAME,
+      purpose: updatedPurpose,
+      status: "PENDING",
+      redirectUri: REDIRECT_URI,
+      websiteUrl: null,
+      logo: null,
+      rejectionReason: null,
+    });
+
+    const ctx = {
+      user: {
+        id: OWNER_USER_ID,
+        role: UserPermissionRole.USER,
+      },
+      prisma: {
+        oAuthClient: {
+          update: prismaUpdate,
+        },
+      } as unknown as PrismaClient,
+    };
+
+    await updateClientHandler({
+      ctx,
+      input: {
+        clientId: CLIENT_ID,
+        purpose: updatedPurpose,
+      },
+    });
+
+    expect(prismaUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { clientId: CLIENT_ID },
+        data: {
+          purpose: updatedPurpose,
+          status: "PENDING",
+          rejectionReason: null,
+        },
+      })
+    );
+  });
 });

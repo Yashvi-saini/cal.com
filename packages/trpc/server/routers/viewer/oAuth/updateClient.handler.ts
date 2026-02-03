@@ -83,12 +83,14 @@ const updateClientHandler = async ({
       logo: clientWithUser.logo,
       websiteUrl: clientWithUser.websiteUrl,
       redirectUri: clientWithUser.redirectUri,
+      purpose: clientWithUser.purpose,
     },
     proposedUpdates: {
       name,
       logo,
       websiteUrl,
       redirectUri,
+      purpose,
     },
   });
 
@@ -160,7 +162,9 @@ type ClientFieldsForReapprovalCheck = {
   name: string;
   logo: string | null;
   websiteUrl: string | null;
+
   redirectUri: string;
+  purpose: string | null;
 };
 
 function triggersReapprovalForOwnerEdit(params: {
@@ -172,6 +176,7 @@ function triggersReapprovalForOwnerEdit(params: {
     logo: string | null;
     websiteUrl: string | null;
     redirectUri: string;
+    purpose: string | null;
   }>;
 }) {
   const { isAdmin, isOwner, currentClient, proposedUpdates } = params;
@@ -188,7 +193,7 @@ function triggersReapprovalForOwnerEdit(params: {
   ) {
     return true;
   }
-  
+
   if (
     proposedUpdates.websiteUrl !== undefined &&
     toNullableString(proposedUpdates.websiteUrl) !== toNullableString(currentClient.websiteUrl)
@@ -197,6 +202,13 @@ function triggersReapprovalForOwnerEdit(params: {
   }
 
   if (proposedUpdates.redirectUri !== undefined && proposedUpdates.redirectUri !== currentClient.redirectUri) {
+    return true;
+  }
+
+  if (
+    proposedUpdates.purpose !== undefined &&
+    toNullableString(proposedUpdates.purpose) !== toNullableString(currentClient.purpose)
+  ) {
     return true;
   }
 
