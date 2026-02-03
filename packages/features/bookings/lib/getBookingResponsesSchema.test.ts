@@ -236,6 +236,75 @@ describe("getBookingResponsesSchema", () => {
         expect(parsedResponses.success).toBe(true);
       });
 
+      test(`optional email field with invalid value should be validated and fail`, async () => {
+        const schema = getBookingResponsesSchema({
+          bookingFields: [
+            {
+              name: "name",
+              type: "name",
+              required: true,
+            },
+            {
+              name: "email",
+              type: "email",
+              required: true,
+            },
+            {
+              name: "optionalEmail",
+              type: "email",
+              required: false,
+            },
+          ] as z.infer<typeof eventTypeBookingFields> & z.BRAND<"HAS_SYSTEM_FIELDS">,
+          view: "ALL_VIEWS",
+        });
+        const parsedResponses = await schema.safeParseAsync({
+          name: "John",
+          email: "john@example.com",
+          optionalEmail: "invalid-email",
+        });
+        expect(parsedResponses.success).toBe(false);
+        if (parsedResponses.success) {
+          throw new Error("Should have failed");
+        }
+        expect(parsedResponses.error.issues[0]).toEqual(
+          expect.objectContaining({
+            message: `{optionalEmail}${CUSTOM_EMAIL_VALIDATION_ERROR_MSG}`,
+            code: "custom",
+          })
+        );
+      });
+
+      test(`optional email field with valid value should pass`, async () => {
+        const schema = getBookingResponsesSchema({
+          bookingFields: [
+            {
+              name: "name",
+              type: "name",
+              required: true,
+            },
+            {
+              name: "email",
+              type: "email",
+              required: true,
+            },
+            {
+              name: "optionalEmail",
+              type: "email",
+              required: false,
+            },
+          ] as z.infer<typeof eventTypeBookingFields> & z.BRAND<"HAS_SYSTEM_FIELDS">,
+          view: "ALL_VIEWS",
+        });
+        const parsedResponses = await schema.safeParseAsync({
+          name: "John",
+          email: "john@example.com",
+          optionalEmail: "optional@example.com",
+        });
+        expect(parsedResponses.success).toBe(true);
+        if (!parsedResponses.success) throw new Error("Should be success");
+        expect((parsedResponses.data as Record<string, unknown>).optionalEmail).toBe("optional@example.com");
+      });
+
       test(`firstName is required and lastName is optional by default`, async () => {
         const schema = getBookingResponsesSchema({
           bookingFields: [
